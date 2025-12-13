@@ -1,4 +1,8 @@
 package com.example.be.auth.dto;
 
-public class LoginResponse {
+public record LoginResponse(
+    String accessToken,
+    String refreshToken
+) {
+
 }
