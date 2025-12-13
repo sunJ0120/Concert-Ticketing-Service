@@ -1,5 +1,6 @@
 package com.example.be.security;
 
+import com.example.be.user.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,58 +12,70 @@ import java.util.Date;
 
 @Component
 public class JwtProvider {
-    private final SecretKey secretKey;
-    private final long accessTokenExpiration;
-    private final long refreshTokenExpiration;
 
-    public JwtProvider(
-            @Value("${jwt.secret}") String secret,
-            @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
-            @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
-        this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        this.accessTokenExpiration = accessTokenExpiration;
-        this.refreshTokenExpiration = refreshTokenExpiration;
+  private final SecretKey secretKey;
+  private final long accessTokenExpiration;
+  private final long refreshTokenExpiration;
+
+  public JwtProvider(
+      @Value("${jwt.secret}") String secret,
+      @Value("${jwt.access-token-expiration}") long accessTokenExpiration,
+      @Value("${jwt.refresh-token-expiration}") long refreshTokenExpiration) {
+    this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    this.accessTokenExpiration = accessTokenExpiration;
+    this.refreshTokenExpiration = refreshTokenExpiration;
+  }
+
+  public String generateAccessToken(Long userId, Role role) {
+    return Jwts.builder()
+        .subject(String.valueOf(userId))
+        .claim("type", "access")
+        .claim("role", role.getRole())
+        .issuedAt(new Date())
+        .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+        .signWith(secretKey)
+        .compact();
+  }
+
+  public String generateRefreshToken(Long userId) {
+    return Jwts.builder()
+        .subject(String.valueOf(userId))
+        .claim("type", "refresh")
+        .issuedAt(new Date())
+        .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
+        .signWith(secretKey)
+        .compact();
+  }
+
+  public boolean validateToken(String token) {
+    try {
+      Jwts.parser()
+          .verifyWith(secretKey)
+          .build()
+          .parseSignedClaims(token);
+    } catch (JwtException e) {
+      return false;
     }
+    return true;
+  }
 
-    public String generateAccessToken(Long userId) {
-        return Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("type", "access")
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
-                .signWith(secretKey)
-                .compact();
-    }
+  public Long getUserId(String token) {
+    Claims claims = Jwts.parser()
+        .verifyWith(secretKey)
+        .build()
+        .parseSignedClaims(token)
+        .getPayload();
 
-    public String generateRefreshToken(Long userId) {
-        return Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("type", "refresh")
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
-                .signWith(secretKey)
-                .compact();
-    }
+    return Long.parseLong(claims.getSubject());
+  }
 
-    public boolean validateToken(String token) {
-        try{
-            Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token);
-        } catch (JwtException e){
-            return false;
-        }
-        return true;
-    }
+  public String getRole(String token) {
+    Claims claims = Jwts.parser()
+        .verifyWith(secretKey)
+        .build()
+        .parseSignedClaims(token)
+        .getPayload();
 
-    public Long getUserId(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-        return Long.parseLong(claims.getSubject());
-    }
+    return claims.get("role", String.class);
+  }
 }
