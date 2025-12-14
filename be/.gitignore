@@ -25,7 +25,8 @@ target/ # Spring Boot Gradle은 build/를 쓰지만, 혹시 모를 maven 등을 
 *.log
 
 # Environment Variables and Secrets (필수 제외 대상)
-.env
+.env.prod
+.env.dev
 local.settings.json
 
 # H2 Database
