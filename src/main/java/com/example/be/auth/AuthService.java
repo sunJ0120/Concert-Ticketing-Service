@@ -3,11 +3,14 @@ package com.example.be.auth;
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
+import com.example.be.auth.service.RedisBlacklistService;
 import com.example.be.security.JwtProvider;
 import com.example.be.user.Role;
 import com.example.be.user.User;
 import com.example.be.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -18,16 +21,23 @@ public class AuthService {
   private final UserRepository userRepository;
   private final JwtProvider jwtProvider;
   private final PasswordEncoder passwordEncoder;
+  private final RedisBlacklistService redisBlacklistService;
 
   public void signup(SignupRequest request) {
-    if (userRepository.findByEmail(request.email()).isPresent()) {
+    if (userRepository.findByEmail(request.email())
+        .isPresent()) {
       throw new IllegalArgumentException("이미 존재하는 이메일입니다.");
     }
 
     String encodedPassword = passwordEncoder.encode(request.password());
 
-    User user = User.builder().email(request.email()).password(encodedPassword).name(request.name())
-        .phone(request.phone()).role(Role.USER).build();
+    User user = User.builder()
+        .email(request.email())
+        .password(encodedPassword)
+        .name(request.name())
+        .phone(request.phone())
+        .role(Role.USER)
+        .build();
 
     userRepository.save(user);
   }
@@ -44,5 +54,12 @@ public class AuthService {
     String refreshToken = jwtProvider.generateRefreshToken(user.getId());
 
     return new LoginResponse(accessToken, refreshToken);
+  }
+
+  public void logout(String token) {
+    long expirationMillis = jwtProvider.getExpiration(token) - System.currentTimeMillis();
+    redisBlacklistService.addToBlacklist(token, expirationMillis);
+
+    SecurityContextHolder.clearContext();
   }
 }

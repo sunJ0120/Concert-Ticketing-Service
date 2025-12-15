@@ -3,12 +3,17 @@ package com.example.be.auth;
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
+import com.example.be.security.JwtProvider;
+import com.example.be.security.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthService authService;
+  private final JwtProvider jwtProvider;
+  private final JwtUtils jwtUtils;
 
   @Operation(summary = "회원가입", description = "새로운 사용자를 등록합니다.")
   @ApiResponses({
@@ -45,8 +52,34 @@ public class AuthController {
     return ResponseEntity.ok(response);
   }
 
+  @Operation(
+      summary = "로그아웃",
+      description = "Access Token을 블랙리스트에 등록하여 로그아웃 처리합니다.",
+      security = {
+          @SecurityRequirement(name = "BearerAuth")
+      }
+  )
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "로그아웃 성공"),
+      @ApiResponse(responseCode = "401", description = "인증 실패")
+  })
+  @PostMapping("/logout")
+  public ResponseEntity<Void> logout(HttpServletRequest request) {
+    String token = jwtUtils.resolveToken(request);
+
+    if (token == null || !jwtProvider.validateToken(token)) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+          .build();
+    }
+
+    authService.logout(token);
+    return ResponseEntity.ok()
+        .build();
+  }
+
   @PostMapping("/refresh")
   public ResponseEntity<?> refresh() {
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok()
+        .build();
   }
 }

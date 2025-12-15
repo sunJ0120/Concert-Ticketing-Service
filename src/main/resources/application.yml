@@ -31,10 +31,15 @@ spring: # dev 환경
     redis:
       host: redis
       port: 6379
-
+      password: ${SPRING_DATA_REDIS_PASSWORD}
 logging:
   level:
     org.springframework.jdbc.datasource.init: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION}
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION}
 
 ---
 

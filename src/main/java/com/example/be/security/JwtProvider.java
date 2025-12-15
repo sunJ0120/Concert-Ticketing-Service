@@ -3,7 +3,13 @@ package com.example.be.security;
 import com.example.be.user.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -48,6 +54,10 @@ public class JwtProvider {
   }
 
   public boolean validateToken(String token) {
+    if (token == null || token.isBlank()) {
+      return false;
+    }
+
     try {
       Jwts.parser()
           .verifyWith(secretKey)
@@ -60,22 +70,40 @@ public class JwtProvider {
   }
 
   public Long getUserId(String token) {
-    Claims claims = Jwts.parser()
-        .verifyWith(secretKey)
-        .build()
-        .parseSignedClaims(token)
-        .getPayload();
+    Claims claims = getClaims(token);
 
     return Long.parseLong(claims.getSubject());
   }
 
   public String getRole(String token) {
-    Claims claims = Jwts.parser()
+    Claims claims = getClaims(token);
+
+    return claims.get("role", String.class);
+  }
+
+  private Claims getClaims(String token) {
+    return Jwts.parser()
         .verifyWith(secretKey)
         .build()
         .parseSignedClaims(token)
         .getPayload();
+  }
 
-    return claims.get("role", String.class);
+  public Long getExpiration(String token) {
+    Claims claims = getClaims(token);
+
+    return claims.getExpiration()
+        .getTime();
+  }
+
+  public Authentication getAuthentication(String token) {
+    Long userId = getUserId(token);
+    String role = getRole(token);
+
+    return new UsernamePasswordAuthenticationToken(
+        userId,
+        null,
+        List.of(new SimpleGrantedAuthority("ROLE_" + role))
+    );
   }
 }
