@@ -8,11 +8,8 @@ import com.example.be.security.JwtProvider;
 import com.example.be.user.Role;
 import com.example.be.user.User;
 import com.example.be.user.UserRepository;
-import java.net.http.HttpRequest;
-import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +18,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthService {
 
+  private final AuthValidator authValidator;
   private final UserRepository userRepository;
   private final JwtProvider jwtProvider;
   private final PasswordEncoder passwordEncoder;
@@ -74,19 +72,20 @@ public class AuthService {
 
   public LoginResponse refresh(String refreshToken) {
     try {
-      jwtProvider.validateToken(refreshToken);
-    } catch (io.jsonwebtoken.JwtException e) {
+      authValidator.validateAndGetToken(refreshToken);
+    } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
       return null;
     }
 
     Long userId = jwtProvider.getUserId(refreshToken);
     Role role = jwtProvider.getRole(refreshToken);
-    if (redisTokenService.isValidRefreshToken(userId, refreshToken)) {
-      // 4. refresh로 accesstoken 갱신
-      String newAccessToken = jwtProvider.generateAccessToken(userId, role);
-      // 5. 다시 전송
-      return new LoginResponse(newAccessToken, null);
+
+    if (!redisTokenService.isValidRefreshToken(userId, refreshToken)) {    // Redis 서버측 검증
+      throw new BadCredentialsException(
+          "Refresh Token이 유효하지 않거나 탈취되었습니다.");    // 서버 측 검증 실패 시 구체적인 예외
     }
-    return null;
+
+    String newAccessToken = jwtProvider.generateAccessToken(userId, role);
+    return new LoginResponse(newAccessToken, null);
   }
 }
