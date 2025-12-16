@@ -43,30 +43,22 @@ public class JwtProvider {
         .compact();
   }
 
-  public String generateRefreshToken(Long userId) {
+  public String generateRefreshToken(Long userId, Role role) {
     return Jwts.builder()
         .subject(String.valueOf(userId))
         .claim("type", "refresh")
+        .claim("role", role.getRole())
         .issuedAt(new Date())
         .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
         .signWith(secretKey)
         .compact();
   }
 
-  public boolean validateToken(String token) {
-    if (token == null || token.isBlank()) {
-      return false;
-    }
-
-    try {
-      Jwts.parser()
-          .verifyWith(secretKey)
-          .build()
-          .parseSignedClaims(token);
-    } catch (JwtException e) {
-      return false;
-    }
-    return true;
+  public void validateToken(String token) {
+    Jwts.parser()
+        .verifyWith(secretKey)
+        .build()
+        .parseSignedClaims(token);
   }
 
   public Long getUserId(String token) {
@@ -75,10 +67,11 @@ public class JwtProvider {
     return Long.parseLong(claims.getSubject());
   }
 
-  public String getRole(String token) {
+  public Role getRole(String token) {
     Claims claims = getClaims(token);
+    String roleName = claims.get("role", String.class);
 
-    return claims.get("role", String.class);
+    return Role.valueOf(roleName);
   }
 
   private Claims getClaims(String token) {
@@ -98,7 +91,7 @@ public class JwtProvider {
 
   public Authentication getAuthentication(String token) {
     Long userId = getUserId(token);
-    String role = getRole(token);
+    String role = getRole(token).getRole();
 
     return new UsernamePasswordAuthenticationToken(
         userId,
