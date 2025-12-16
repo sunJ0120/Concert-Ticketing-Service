@@ -1,6 +1,6 @@
 package com.example.be.security;
 
-import com.example.be.auth.service.RedisBlacklistService;
+import com.example.be.auth.service.RedisTokenService;
 import com.example.be.user.Role;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,18 +22,15 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtProvider jwtProvider;
-  private final RedisBlacklistService redisBlacklistService;
+  private final RedisTokenService redisTokenService;
   private final JwtUtils jwtUtils;
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
     String path = request.getRequestURI();
 
-    return path.startsWith("/swagger-ui")
-        || path.startsWith("/v3/api-docs")
-        || path.startsWith("/swagger-resources")
-        || path.startsWith("/h2-console")
-        || path.startsWith("/auth");
+    return path.startsWith("/swagger-ui") || path.startsWith("/v3/api-docs") || path.startsWith(
+        "/swagger-resources") || path.startsWith("/h2-console") || path.startsWith("/auth");
   }
 
   @Override
@@ -44,18 +41,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     if (token == null || token.isBlank()) {
       filterChain.doFilter(request, response);
-      return;
     }
 
-    if(redisBlacklistService.isBlacklisted(token)){
+    try {
+      jwtProvider.validateToken(token);
+    } catch (io.jsonwebtoken.JwtException e) {
+      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+      response.getWriter().println(e.getMessage());
+
+      return;    // 필터 중단
+    }
+
+    if(redisTokenService.isBlacklisted(token)){
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       return;
     }
 
-    if (jwtProvider.validateToken(token)) {    // 2. token 유효성을 jwtProvider로 검사
-      Authentication authentication = jwtProvider.getAuthentication(token);
-      SecurityContextHolder.getContext().setAuthentication(authentication);
-    }
+    Authentication authentication = jwtProvider.getAuthentication(token);
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+
     filterChain.doFilter(request, response);
   }
 }
