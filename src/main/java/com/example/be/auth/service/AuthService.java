@@ -1,9 +1,9 @@
-package com.example.be.auth;
+package com.example.be.auth.service;
 
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
-import com.example.be.auth.service.RedisTokenService;
+import com.example.be.auth.validator.AuthValidator;
 import com.example.be.security.JwtProvider;
 import com.example.be.user.Role;
 import com.example.be.user.User;

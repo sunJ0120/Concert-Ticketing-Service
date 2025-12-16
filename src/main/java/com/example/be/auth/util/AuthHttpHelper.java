@@ -1,4 +1,4 @@
-package com.example.be.auth;
+package com.example.be.auth.util;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
