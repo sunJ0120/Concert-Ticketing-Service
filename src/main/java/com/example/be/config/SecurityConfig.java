@@ -1,6 +1,7 @@
 package com.example.be.config;
 
 import com.example.be.auth.service.RedisTokenService;
+import com.example.be.auth.util.OAuthLoginSuccessHandler;
 import com.example.be.security.JwtAuthenticationFilter;
 import com.example.be.security.JwtProvider;
 import com.example.be.security.JwtUtils;
@@ -9,6 +10,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -28,6 +30,7 @@ public class SecurityConfig {
   private final JwtProvider jwtProvider;
   private final RedisTokenService redisTokenService;
   private final JwtUtils jwtUtils;
+  private final OAuthLoginSuccessHandler oAuthLoginSuccessHandler;
 
   @Bean
   public PasswordEncoder passwordEncoder() {
@@ -62,11 +65,13 @@ public class SecurityConfig {
             auth -> auth
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
                     "/swagger-resources/**").permitAll()
+                .requestMatchers("/auth/login/social").permitAll()
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").hasRole("USER").anyRequest()
                 .authenticated())
+        .oauth2Login(oauth2 -> oauth2.successHandler(oAuthLoginSuccessHandler))
         .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
         .formLogin(form -> form.disable())
         .httpBasic(httpBasic -> httpBasic.disable())

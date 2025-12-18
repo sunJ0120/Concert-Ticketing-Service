@@ -13,13 +13,18 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.micrometer.metrics.autoconfigure.export.appoptics.AppOpticsProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +40,9 @@ public class AuthController {
   private final AuthValidator authValidator;
   private final AuthHttpHelper authHttpHelper;
   private final JwtUtils jwtUtils;
+
+  @Value("${app.frontend-url}")
+  private String frontendUrl;
 
   @Operation(summary = "회원가입", description = "새로운 사용자를 등록합니다.")
   @ApiResponses({@ApiResponse(responseCode = "200", description = "회원가입 성공"),
@@ -62,6 +70,37 @@ public class AuthController {
     return ResponseEntity.ok()
         .header(HttpHeaders.SET_COOKIE, responseCookie.toString())
         .body(response);
+  }
+
+  // 소셜 로그인 구현
+  @Operation(summary = "소셜 로그인", description = "Oauth2 프로토콜을 활용합니다.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "로그인 성공"),
+      @ApiResponse(responseCode = "403", description = "잘못된 접근")})
+  @GetMapping("/login/social")
+  public void socialLogin(HttpServletRequest request, HttpServletResponse response)
+      throws IOException {
+
+    // forward 검증
+    if (request.getAttribute("OAUTH2_AUTHENTICATED") == null) {
+      response.sendError(HttpStatus.FORBIDDEN.value());
+      return;
+    }
+
+    String provider = (String) request.getAttribute("provider");
+    String providerId = (String) request.getAttribute("providerId");
+    String email = (String) request.getAttribute("email");
+    String name = (String) request.getAttribute("name");
+
+    LoginResponse loginResponse = authService.socialLogin(provider, providerId, email, name);
+
+    // refreshToken 분리해서 따로 HttpOnly에 저장
+    String refreshToken = loginResponse.refreshToken();
+    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(refreshToken);
+    response.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString());
+
+    // accesss token만 전달
+    response.sendRedirect(
+        frontendUrl + "/oauth/callback?token=" + loginResponse.accessToken());
   }
 
   @Operation(summary = "로그아웃", description = "Access Token을 블랙리스트에 등록하여 로그아웃 처리합니다.", security = {

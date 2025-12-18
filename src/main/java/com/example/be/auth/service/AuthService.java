@@ -5,9 +5,14 @@ import com.example.be.auth.dto.LoginResponse;
 import com.example.be.auth.dto.SignupRequest;
 import com.example.be.auth.validator.AuthValidator;
 import com.example.be.security.JwtProvider;
+import com.example.be.user.Provider;
 import com.example.be.user.Role;
+import com.example.be.user.SocialAccount;
+import com.example.be.user.SocialAccountRepository;
 import com.example.be.user.User;
 import com.example.be.user.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,7 +23,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthService {
 
-  private final AuthValidator authValidator;
+  private final SocialAccountRepository socialAccountRepository;
   private final UserRepository userRepository;
   private final JwtProvider jwtProvider;
   private final PasswordEncoder passwordEncoder;
@@ -36,7 +41,6 @@ public class AuthService {
         .email(request.email())
         .password(encodedPassword)
         .name(request.name())
-        .phone(request.phone())
         .role(Role.USER)
         .build();
 
@@ -51,6 +55,40 @@ public class AuthService {
       throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
     }
 
+    return createTokens(user);
+  }
+
+  @Transactional
+  public LoginResponse socialLogin(String provider, String providerId, String email, String name) {
+    User user = userRepository.findByEmail(email)
+        .orElseGet(() -> {
+          User newUser = User.builder()
+              .email(email)
+              .password(null)
+              .name(name)
+              .role(Role.USER)
+              .build();
+
+          return userRepository.save(newUser);
+        });
+
+    Provider providerEnum = Provider.valueOf(provider.toUpperCase());
+    socialAccountRepository.findByProviderAndProviderId(providerEnum,
+            providerId)
+        .orElseGet(() -> {
+          SocialAccount newSocialAccount = SocialAccount.builder()
+              .provider(providerEnum)
+              .providerId(providerId)
+              .user(user)
+              .build();
+
+          return socialAccountRepository.save(newSocialAccount);
+        });
+
+    return createTokens(user);
+  }
+
+  private LoginResponse createTokens(User user) {
     String accessToken = jwtProvider.generateAccessToken(user.getId(), user.getRole());
     String refreshToken = jwtProvider.generateRefreshToken(user.getId(), user.getRole());
 
@@ -71,12 +109,6 @@ public class AuthService {
   }
 
   public LoginResponse refresh(String refreshToken) {
-    try {
-      authValidator.validateAndGetToken(refreshToken);
-    } catch (io.jsonwebtoken.JwtException | IllegalArgumentException e) {
-      return null;
-    }
-
     Long userId = jwtProvider.getUserId(refreshToken);
     Role role = jwtProvider.getRole(refreshToken);
 
