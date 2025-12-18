@@ -64,6 +64,32 @@ public class AuthController {
         .body(response);
   }
 
+  // 소셜 로그인 구현
+  @Operation(summary = "소셜 로그인", description = "Oauth2 프로토콜을 활용합니다.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "로그인 성공"),
+      @ApiResponse(responseCode = "403", description = "잘못된 접근")})
+  @PostMapping("/login/social")
+  public ResponseEntity<LoginResponse> socialLogin(HttpServletRequest request) {
+
+    String provider = (String) request.getAttribute("provider");
+    String providerId = (String) request.getAttribute("providerId");
+    String email = (String) request.getAttribute("email");
+    String name = (String) request.getAttribute("name");
+
+    LoginResponse response = authService.socialLogin(provider, providerId, email, name);
+
+    // refreshToken 분리해서 따로 HttpOnly에 저장
+    String refreshToken = response.refreshToken();
+    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(refreshToken);
+
+    response = new LoginResponse(response.accessToken(), null);
+
+    // accesss token만 전달
+    return ResponseEntity.ok()
+        .header(HttpHeaders.SET_COOKIE, responseCookie.toString())
+        .body(response);
+  }
+
   @Operation(summary = "로그아웃", description = "Access Token을 블랙리스트에 등록하여 로그아웃 처리합니다.", security = {
       @SecurityRequirement(name = "BearerAuth")})
   @ApiResponses({@ApiResponse(responseCode = "200", description = "로그아웃 성공"),
