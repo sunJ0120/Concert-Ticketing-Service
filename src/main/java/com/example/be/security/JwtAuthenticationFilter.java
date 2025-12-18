@@ -37,6 +37,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     if (token == null || token.isBlank()) {
       filterChain.doFilter(request, response);
+      return;
     }
 
     try {
@@ -44,7 +45,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     } catch (io.jsonwebtoken.JwtException e) {
       response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
       response.getWriter().println(e.getMessage());
-
       return;    // 필터 중단
     }
 
