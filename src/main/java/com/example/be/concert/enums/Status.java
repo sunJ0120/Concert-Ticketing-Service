@@ -1,4 +1,4 @@
-package com.example.be.concert;
+package com.example.be.concert.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
