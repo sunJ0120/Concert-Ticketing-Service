@@ -1,6 +1,5 @@
 -- ================================================
--- TICKETBLITZ - MySQL Production Schema
--- Option B (Template Pattern)
+-- TICKETBLITZ - MySQL Production Version
 -- ================================================
 
 -- ------------------------------------------------
@@ -8,297 +7,472 @@
 -- ------------------------------------------------
 CREATE TABLE users
 (
-    id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    id         BIGINT PRIMARY KEY AUTO_INCREMENT,
     email      VARCHAR(255) UNIQUE NOT NULL,
-    password   VARCHAR(255)        NULL COMMENT 'NULL: 소셜 로그인 전용',
+    password   VARCHAR(255)        NULL,
     name       VARCHAR(100)        NOT NULL,
-    phone      VARCHAR(20)         NULL,
-    role       VARCHAR(20)         NOT NULL DEFAULT 'USER',
-    created_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    INDEX idx_email (email),
-    INDEX idx_role (role)
+    role       VARCHAR(20) DEFAULT 'USER',
+    created_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP   DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='회원 정보';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 1-1. 소셜 계정 연동 (social_accounts)
 -- ------------------------------------------------
 CREATE TABLE social_accounts
 (
-    id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id     BIGINT UNSIGNED NOT NULL,
-    provider    VARCHAR(20)     NOT NULL COMMENT 'KAKAO, NAVER, GOOGLE',
-    provider_id VARCHAR(255)    NOT NULL,
-    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id     BIGINT       NOT NULL,
+    provider    VARCHAR(20)  NOT NULL,
+    provider_id VARCHAR(255) NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    UNIQUE KEY uk_provider_account (provider, provider_id),
+    CONSTRAINT fk_social_account_user
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT uk_provider_account UNIQUE (provider, provider_id),
     INDEX idx_user_id (user_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='소셜 로그인 연동';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 2. 공연장 템플릿 (section_templates)
 -- ------------------------------------------------
 CREATE TABLE section_templates
 (
-    id            BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
     venue_name    VARCHAR(100) NOT NULL,
     section_name  VARCHAR(50)  NOT NULL,
-    row_count     INT UNSIGNED NOT NULL DEFAULT 0,
-    seats_per_row INT UNSIGNED NOT NULL DEFAULT 0,
-    color         VARCHAR(7)   NULL COMMENT 'Hex color code',
-    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    row_count     INT          NOT NULL,
+    seats_per_row INT          NOT NULL,
+    color         VARCHAR(7) DEFAULT '#808080',
+    created_at    TIMESTAMP  DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP  DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    UNIQUE KEY uk_venue_section (venue_name, section_name),
-    INDEX idx_venue_name (venue_name)
+    CONSTRAINT uk_venue_section UNIQUE (venue_name, section_name),
+    CONSTRAINT chk_row_count_positive CHECK (row_count > 0),
+    CONSTRAINT chk_seats_per_row_positive CHECK (seats_per_row > 0)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='공연장 구역 템플릿 (재사용)';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 3. 공연 (concerts) - Venue Embedded
 -- ------------------------------------------------
 CREATE TABLE concerts
 (
-    id               BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
     title            VARCHAR(300) NOT NULL,
-    artist           VARCHAR(200) NULL,
-    description      TEXT         NULL,
-    poster_url       VARCHAR(500) NULL,
+    artist           VARCHAR(200),
+    description      TEXT,
+    poster_url       VARCHAR(500),
 
-    -- Venue (Embeddable)
-    venue_name       VARCHAR(100) NOT NULL COMMENT 'Embedded: 공연장 이름',
-    venue_address    VARCHAR(300) NOT NULL COMMENT 'Embedded: 공연장 주소',
-    venue_capacity   INT UNSIGNED NULL COMMENT 'Embedded: 수용 인원',
+    -- Venue Embedded 필드들
+    venue_name       VARCHAR(100) NOT NULL,
+    venue_address    VARCHAR(300) NOT NULL,
+    venue_seats      INT,
+    venue_latitude   DOUBLE,
+    venue_longitude  DOUBLE,
 
-    -- 공연 일정
-    start_date       DATETIME     NOT NULL,
-    end_date         DATETIME     NOT NULL,
+    start_date       TIMESTAMP    NOT NULL,
+    end_date         TIMESTAMP    NOT NULL,
+    booking_start_at TIMESTAMP    NOT NULL,
+    booking_end_at   TIMESTAMP    NOT NULL,
+    status           VARCHAR(20) DEFAULT 'SCHEDULED',
 
-    -- 예매 기간
-    booking_start_at DATETIME     NOT NULL,
-    booking_end_at   DATETIME     NOT NULL,
-
-    -- 공연 상태
-    status           VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED' COMMENT 'SCHEDULED, OPEN, BOOKING, CLOSED, CANCELLED',
-
-    -- 메타데이터
-    created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at       TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP   DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     CONSTRAINT chk_concert_dates CHECK (end_date >= start_date),
     CONSTRAINT chk_booking_dates CHECK (booking_end_at >= booking_start_at),
-
     INDEX idx_status (status),
-    INDEX idx_dates (start_date, end_date),
-    INDEX idx_venue_name (venue_name),
     INDEX idx_booking_dates (booking_start_at, booking_end_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='공연 정보 (Venue Embedded)';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 4. 공연별 구역 (concert_sections)
 -- ------------------------------------------------
 CREATE TABLE concert_sections
 (
-    id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    concert_id   BIGINT UNSIGNED NOT NULL,
-    template_id  BIGINT UNSIGNED NOT NULL,
-    price        DECIMAL(10, 0)  NOT NULL,
-    is_available BOOLEAN         NOT NULL DEFAULT TRUE,
-    created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
+    concert_id   BIGINT         NOT NULL,
+    template_id  BIGINT         NOT NULL,
+    price        DECIMAL(10, 0) NOT NULL,
+    is_available BOOLEAN        NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMP               DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP               DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (concert_id) REFERENCES concerts (id) ON DELETE CASCADE,
-    FOREIGN KEY (template_id) REFERENCES section_templates (id),
-    UNIQUE KEY uk_concert_template (concert_id, template_id),
+    CONSTRAINT fk_concert_section_concert
+        FOREIGN KEY (concert_id) REFERENCES concerts (id) ON DELETE CASCADE,
+    CONSTRAINT fk_concert_section_template
+        FOREIGN KEY (template_id) REFERENCES section_templates (id),
+    CONSTRAINT uk_concert_template UNIQUE (concert_id, template_id),
     CONSTRAINT chk_price_positive CHECK (price >= 0),
-
-    INDEX idx_concert_id (concert_id),
-    INDEX idx_template_id (template_id),
-    INDEX idx_concert_available (concert_id, is_available)
+    INDEX idx_concert_id (concert_id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='공연별 구역 (Concert + Template)';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 5. 공연별 좌석 (concert_seats)
 -- ------------------------------------------------
 CREATE TABLE concert_seats
 (
-    id         BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    section_id BIGINT UNSIGNED NOT NULL,
-    row_num    INT UNSIGNED    NOT NULL,
-    seat_num   INT UNSIGNED    NOT NULL,
-    seat_label VARCHAR(20)     NULL,
-    status     VARCHAR(20)     NOT NULL DEFAULT 'AVAILABLE' COMMENT 'AVAILABLE, RESERVED, SOLD, UNAVAILABLE',
-    created_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    section_id  BIGINT      NOT NULL,
+    row_num     INT         NOT NULL,
+    seat_num    INT         NOT NULL,
+    seat_label  VARCHAR(20),
+    seat_status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    created_at  TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (section_id) REFERENCES concert_sections (id) ON DELETE CASCADE,
-    UNIQUE KEY uk_seat_position (section_id, row_num, seat_num),
+    CONSTRAINT fk_concert_seat_section
+        FOREIGN KEY (section_id) REFERENCES concert_sections (id) ON DELETE CASCADE,
+    CONSTRAINT uk_seat_position UNIQUE (section_id, row_num, seat_num),
     CONSTRAINT chk_row_positive CHECK (row_num > 0),
     CONSTRAINT chk_seat_positive CHECK (seat_num > 0),
-
-    INDEX idx_section_id (section_id),
-    INDEX idx_section_status (section_id, status),
-    INDEX idx_status (status)
+    INDEX idx_section_status (section_id, seat_status)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='공연별 좌석';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 6. 예매 (reservations)
 -- ------------------------------------------------
 CREATE TABLE reservations
 (
-    id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id      BIGINT UNSIGNED NOT NULL,
-    seat_id      BIGINT UNSIGNED NOT NULL,
-    price        DECIMAL(10, 0)  NOT NULL,
-    status       VARCHAR(20)     NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING, CONFIRMED, CANCELLED, EXPIRED',
-    reserved_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    confirmed_at DATETIME        NULL,
-    cancelled_at DATETIME        NULL,
-    expires_at   DATETIME        NULL,
-    created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    id                 BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id            BIGINT         NOT NULL,
+    seat_id            BIGINT         NOT NULL,
+    price              DECIMAL(10, 0) NOT NULL,
+    reservation_status VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
+    reserved_at        TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at       TIMESTAMP      NULL,
+    cancelled_at       TIMESTAMP      NULL,
+    expires_at         TIMESTAMP      NULL,
+    created_at         TIMESTAMP               DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP               DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (user_id) REFERENCES users (id),
-    FOREIGN KEY (seat_id) REFERENCES concert_seats (id),
-    CONSTRAINT chk_price_positive CHECK (price >= 0),
-
+    CONSTRAINT fk_reservation_user
+        FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_reservation_seat
+        FOREIGN KEY (seat_id) REFERENCES concert_seats (id),
+    CONSTRAINT chk_reservation_price_positive CHECK (price >= 0),
     INDEX idx_user_id (user_id),
-    INDEX idx_seat_id (seat_id),
-    INDEX idx_status (status),
+    INDEX idx_status (reservation_status),
     INDEX idx_expires_at (expires_at)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='좌석 예매';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
 -- 7. 결제 (payments)
 -- ------------------------------------------------
 CREATE TABLE payments
 (
-    id                BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    reservation_id    BIGINT UNSIGNED NOT NULL,
-    order_id          VARCHAR(50)     NOT NULL UNIQUE,
+    id                BIGINT PRIMARY KEY AUTO_INCREMENT,
+    reservation_id    BIGINT         NOT NULL,
+    order_id          VARCHAR(50)    NOT NULL UNIQUE,
 
-    amount            DECIMAL(10, 0)  NOT NULL,
-    payment_method    VARCHAR(20)     NOT NULL COMMENT 'CARD, BANK_TRANSFER, VIRTUAL_ACCOUNT',
-    status            VARCHAR(20)     NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING, CONFIRMED, FAILED, REFUNDED',
+    amount            DECIMAL(10, 0) NOT NULL,
+    payment_method    VARCHAR(20)    NOT NULL,
+    payment_status    VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
 
     -- PG 응답 정보
-    pg_transaction_id VARCHAR(100)    NULL COMMENT '다날 transactionId',
-    pg_response_code  VARCHAR(20)     NULL COMMENT '다날 code (SUCCESS/FAIL)',
+    pg_transaction_id VARCHAR(100),
+    pg_response_code  VARCHAR(20),
 
     -- 타임스탬프
-    initiated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    confirmed_at      DATETIME        NULL,
-    refunded_at       DATETIME        NULL,
-    created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    initiated_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at      TIMESTAMP      NULL,
+    refunded_at       TIMESTAMP      NULL,
+    created_at        TIMESTAMP               DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMP               DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE RESTRICT,
-    CONSTRAINT chk_amount_positive CHECK (amount > 0),
-
+    CONSTRAINT fk_payment_reservation
+        FOREIGN KEY (reservation_id) REFERENCES reservations (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_payment_amount_positive CHECK (amount >= 0),
     INDEX idx_reservation_id (reservation_id),
-    INDEX idx_order_id (order_id),
-    INDEX idx_status (status),
-    INDEX idx_pg_transaction_id (pg_transaction_id)
+    INDEX idx_status (payment_status)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='결제 정보';
+  COLLATE = utf8mb4_unicode_ci;
 
 -- ------------------------------------------------
--- 7-1. 결제 로그 (payment_logs)
+-- 8. 결제 로그 (payment_logs)
 -- ------------------------------------------------
 CREATE TABLE payment_logs
 (
-    id                  BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    payment_id          BIGINT UNSIGNED NOT NULL,
-    event_type          VARCHAR(20)     NOT NULL COMMENT 'INITIATED, CONFIRMED, FAILED, REFUNDED',
-    old_status          VARCHAR(20)     NULL,
-    new_status          VARCHAR(20)     NULL,
+    id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
+    payment_id          BIGINT      NOT NULL,
+    event_type          VARCHAR(20) NOT NULL,
+    old_status          VARCHAR(20),
+    new_status          VARCHAR(20),
 
-    -- PG 상세 응답
-    pg_response_code    VARCHAR(20)     NULL,
-    pg_response_message TEXT            NULL,
-    pg_raw_response     TEXT            NULL COMMENT '원본 JSON',
+    -- PG 상세 응답 (로그용)
+    pg_response_code    VARCHAR(20),
+    pg_response_message TEXT,
+    pg_raw_response     TEXT,
 
-    created_at          DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE,
-
+    CONSTRAINT fk_payment_log_payment
+        FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE,
     INDEX idx_payment_id (payment_id),
-    INDEX idx_event_type (event_type),
-    INDEX idx_created_at (created_at)
+    INDEX idx_event_type (event_type)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='결제 이벤트 로그 (감사 추적)';
-
--- ------------------------------------------------
--- 8. 대기열 (waiting_queue)
--- ------------------------------------------------
-CREATE TABLE waiting_queue
-(
-    id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id      BIGINT UNSIGNED NOT NULL,
-    concert_id   BIGINT UNSIGNED NOT NULL,
-
-    queue_token  VARCHAR(100)    NOT NULL UNIQUE,
-    position     INT UNSIGNED    NOT NULL,
-    status       VARCHAR(20)     NOT NULL DEFAULT 'WAITING' COMMENT 'WAITING, ACTIVE, EXPIRED',
-
-    entered_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    activated_at DATETIME        NULL,
-    expires_at   DATETIME        NULL,
-
-    created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (concert_id) REFERENCES concerts (id) ON DELETE CASCADE,
-    CONSTRAINT chk_position_positive CHECK (position > 0),
-
-    INDEX idx_user_id (user_id),
-    INDEX idx_concert_id (concert_id),
-    INDEX idx_queue_token (queue_token),
-    INDEX idx_concert_status (concert_id, status),
-    INDEX idx_expires_at (expires_at)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4
-  COLLATE = utf8mb4_unicode_ci
-    COMMENT ='대기열 (Redis로 이전 예정)';
+  COLLATE = utf8mb4_unicode_ci;
 
 
 -- ================================================
--- 프로덕션 초기 데이터 (필수 템플릿만)
+-- 샘플 데이터
 -- ================================================
 
--- 공연장 템플릿 (실제 공연장 데이터)
+-- ------------------------------------------------
+-- 1. 공연장 템플릿 (section_templates)
+-- ------------------------------------------------
 INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
-VALUES
-    -- 올림픽공원 체조경기장
-    ('올림픽공원 체조경기장', 'VIP', 2, 12, '#FFD700'),
-    ('올림픽공원 체조경기장', 'R', 8, 16, '#E066FF'),
-    ('올림픽공원 체조경기장', 'S', 6, 20, '#00BFFF'),
-    ('올림픽공원 체조경기장', 'A', 4, 22, '#7CFC00');
+VALUES ('올림픽공원 체조경기장', 'VIP', 2, 12, '#FFD700'),
+       ('올림픽공원 체조경기장', 'R', 8, 16, '#E066FF'),
+       ('올림픽공원 체조경기장', 'S', 6, 20, '#00BFFF'),
+       ('올림픽공원 체조경기장', 'A', 4, 22, '#7CFC00');
 
--- 추가 공연장은 어드민 페이지에서 등록
+INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
+VALUES ('고척스카이돔', 'VIP', 3, 15, '#FFD700'),
+       ('고척스카이돔', 'R', 10, 20, '#E066FF'),
+       ('고척스카이돔', 'S', 8, 25, '#00BFFF'),
+       ('고척스카이돔', 'A', 6, 30, '#7CFC00');
+
+INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
+VALUES ('잠실실내체육관', 'VIP', 2, 10, '#FFD700'),
+       ('잠실실내체육관', 'R', 6, 15, '#E066FF'),
+       ('잠실실내체육관', 'S', 5, 18, '#00BFFF');
+
+-- ------------------------------------------------
+-- 2. 공연 (concerts) - Venue Embedded
+-- ------------------------------------------------
+INSERT INTO concerts (title, artist, description, poster_url,
+                      venue_name, venue_address, venue_seats,
+                      start_date, end_date,
+                      booking_start_at, booking_end_at,
+                      status)
+VALUES ('IU Concert: The Golden Hour',
+        'IU',
+        '아이유의 감성 라이브 콘서트',
+        'https://example.com/posters/iu-golden-hour.jpg',
+        '올림픽공원 체조경기장',
+        '서울특별시 송파구 올림픽로 424',
+        15000,
+        '2025-03-15 19:00:00',
+        '2025-03-15 22:00:00',
+        '2025-01-15 20:00:00',
+        '2025-03-15 18:00:00',
+        'BOOKING_OPEN'),
+       ('BTS Yet To Come',
+        'BTS',
+        'BTS 컴백 콘서트',
+        'https://example.com/posters/bts-yet-to-come.jpg',
+        '올림픽공원 체조경기장',
+        '서울특별시 송파구 올림픽로 424',
+        15000,
+        '2025-04-20 18:00:00',
+        '2025-04-20 22:00:00',
+        '2025-02-20 20:00:00',
+        '2025-04-20 17:00:00',
+        'SCHEDULED');
+
+-- ------------------------------------------------
+-- 3. 공연별 구역 (concert_sections)
+-- ------------------------------------------------
+INSERT INTO concert_sections (concert_id, template_id, price, is_available)
+VALUES (1, 1, 220000, TRUE), -- VIP
+       (1, 2, 154000, TRUE), -- R
+       (1, 3, 110000, TRUE), -- S
+       (1, 4, 77000, TRUE); -- A
+
+INSERT INTO concert_sections (concert_id, template_id, price, is_available)
+VALUES (2, 1, 300000, TRUE), -- VIP
+       (2, 2, 200000, TRUE), -- R
+       (2, 3, 150000, TRUE), -- S
+       (2, 4, 100000, TRUE);
+-- A
+
+-- ------------------------------------------------
+-- 4. 공연별 좌석 (concert_seats) - 샘플만
+-- ------------------------------------------------
+-- IU 콘서트 VIP 좌석 (전체: 2줄 × 12석 = 24석)
+INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
+SELECT 1                                          as section_id,
+       r.row_num,
+       s.seat_num,
+       CONCAT('VIP-', r.row_num, '-', s.seat_num) as seat_label,
+       'AVAILABLE'                                as seat_status
+FROM (SELECT 1 as row_num UNION ALL SELECT 2) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION ALL
+                     SELECT 2
+                     UNION ALL
+                     SELECT 3
+                     UNION ALL
+                     SELECT 4
+                     UNION ALL
+                     SELECT 5
+                     UNION ALL
+                     SELECT 6
+                     UNION ALL
+                     SELECT 7
+                     UNION ALL
+                     SELECT 8
+                     UNION ALL
+                     SELECT 9
+                     UNION ALL
+                     SELECT 10
+                     UNION ALL
+                     SELECT 11
+                     UNION ALL
+                     SELECT 12) s;
+
+-- IU 콘서트 R 좌석 (샘플: 처음 2줄만)
+INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
+SELECT 2                                        as section_id,
+       r.row_num,
+       s.seat_num,
+       CONCAT('R-', r.row_num, '-', s.seat_num) as seat_label,
+       'AVAILABLE'                              as seat_status
+FROM (SELECT 1 as row_num UNION ALL SELECT 2) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION ALL
+                     SELECT 2
+                     UNION ALL
+                     SELECT 3
+                     UNION ALL
+                     SELECT 4
+                     UNION ALL
+                     SELECT 5
+                     UNION ALL
+                     SELECT 6
+                     UNION ALL
+                     SELECT 7
+                     UNION ALL
+                     SELECT 8
+                     UNION ALL
+                     SELECT 9
+                     UNION ALL
+                     SELECT 10
+                     UNION ALL
+                     SELECT 11
+                     UNION ALL
+                     SELECT 12
+                     UNION ALL
+                     SELECT 13
+                     UNION ALL
+                     SELECT 14
+                     UNION ALL
+                     SELECT 15
+                     UNION ALL
+                     SELECT 16) s;
+
+-- BTS 콘서트 VIP 좌석 (전체: 2줄 × 12석 = 24석)
+INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
+SELECT 5                                          as section_id,
+       r.row_num,
+       s.seat_num,
+       CONCAT('VIP-', r.row_num, '-', s.seat_num) as seat_label,
+       'AVAILABLE'                                as seat_status
+FROM (SELECT 1 as row_num UNION ALL SELECT 2) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION ALL
+                     SELECT 2
+                     UNION ALL
+                     SELECT 3
+                     UNION ALL
+                     SELECT 4
+                     UNION ALL
+                     SELECT 5
+                     UNION ALL
+                     SELECT 6
+                     UNION ALL
+                     SELECT 7
+                     UNION ALL
+                     SELECT 8
+                     UNION ALL
+                     SELECT 9
+                     UNION ALL
+                     SELECT 10
+                     UNION ALL
+                     SELECT 11
+                     UNION ALL
+                     SELECT 12) s;
+
+-- ------------------------------------------------
+-- 5. 사용자 (users)
+-- ------------------------------------------------
+INSERT INTO users (email, password, name, role)
+VALUES ('admin@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNKJsWqE.m',
+        '관리자', 'ADMIN'),
+       ('user1@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNKJsWqE.m',
+        '김철수', 'USER'),
+       ('user2@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNKJsWqE.m',
+        '이영희', 'USER');
+
+
+-- ================================================
+-- 샘플 예매 데이터
+-- ================================================
+
+-- user1이 IU 콘서트 VIP-1-1 예매
+INSERT INTO reservations (user_id, seat_id, price, reservation_status, reserved_at, expires_at)
+VALUES (2, 1, 220000, 'CONFIRMED', NOW(), DATE_ADD(NOW(), INTERVAL 15 MINUTE));
+
+-- user2가 IU 콘서트 VIP-1-2 예매 (결제 대기)
+INSERT INTO reservations (user_id, seat_id, price, reservation_status, reserved_at, expires_at)
+VALUES (3, 2, 220000, 'PENDING', NOW(), DATE_ADD(NOW(), INTERVAL 15 MINUTE));
+
+-- 예매한 좌석 상태 업데이트
+UPDATE concert_seats
+SET seat_status = 'SOLD'
+WHERE id = 1;
+UPDATE concert_seats
+SET seat_status = 'RESERVED'
+WHERE id = 2;
+
+
+-- ================================================
+-- 데이터 확인 쿼리
+-- ================================================
+
+-- 1. 템플릿 확인
+-- SELECT * FROM section_templates ORDER BY venue_name, section_name;
+
+-- 2. 공연 확인
+-- SELECT id, title, artist, venue_name, status FROM concerts;
+
+-- 3. 공연별 구역 확인
+-- SELECT c.title, st.section_name, cs.price, cs.is_available
+-- FROM concert_sections cs
+-- JOIN concerts c ON cs.concert_id = c.id
+-- JOIN section_templates st ON cs.template_id = st.id
+-- ORDER BY c.id, st.section_name;
+
+-- 4. IU 콘서트 예매 가능 좌석 확인
+-- SELECT cs.seat_label, cs.seat_status, sec.price
+-- FROM concert_seats cs
+-- JOIN concert_sections sec ON cs.section_id = sec.id
+-- WHERE sec.concert_id = 1 AND cs.seat_status = 'AVAILABLE'
+-- ORDER BY cs.row_num, cs.seat_num;
+
+-- 5. 사용자 예매 내역 확인
+-- SELECT u.name, c.title, cs.seat_label, r.price, r.reservation_status
+-- FROM reservations r
+-- JOIN users u ON r.user_id = u.id
+-- JOIN concert_seats cs ON r.seat_id = cs.id
+-- JOIN concert_sections sec ON cs.section_id = sec.id
+-- JOIN concerts c ON sec.concert_id = c.id;
