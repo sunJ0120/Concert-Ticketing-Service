@@ -1,7 +1,9 @@
-package com.example.be.payment;
+package com.example.be.payment.domain;
 
 import com.example.be.common.BaseTimeEntity;
-import com.example.be.reservation.Reservation;
+import com.example.be.payment.enums.PaymentMethod;
+import com.example.be.payment.enums.PaymentStatus;
+import com.example.be.reservation.domain.Reservation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -15,6 +17,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -41,9 +44,11 @@ public class Payment extends BaseTimeEntity {
   @Column(name = "order_id", nullable = false, length = 50, unique = true)
   private String orderId;
 
+  @Min(value = 0, message = "결제 금액은 0 이상이어야 합니다.")
   @Column(nullable = false, precision = 10, scale = 0)
   private BigDecimal amount;
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "payment_method", nullable = false, length = 20)
   private PaymentMethod paymentMethod;
 
@@ -69,27 +74,11 @@ public class Payment extends BaseTimeEntity {
   @Builder
   public Payment(Reservation reservation, String orderId, BigDecimal amount,
       PaymentMethod paymentMethod) {
-    validateAmount(amount);
     this.reservation = reservation;
     this.orderId = orderId;
     this.amount = amount;
     this.paymentMethod = paymentMethod;
+    this.paymentStatus = PaymentStatus.PENDING;
     this.initiatedAt = LocalDateTime.now();
-
-    // 0원 결제는 PG 거치지 않고 바로 완료 처리
-    if (isZeroPayment()) {
-      this.paymentStatus = PaymentStatus.COMPLETED;
-      this.confirmedAt = LocalDateTime.now();
-    }
-  }
-
-  private void validateAmount(BigDecimal amount) {
-    if (amount == null || amount.compareTo(BigDecimal.ZERO) < 0) {
-      throw new IllegalArgumentException("결제 금액은 0 이상이어야 합니다.");
-    }
-  }
-
-  private boolean isZeroPayment() {
-    return amount.compareTo(BigDecimal.ZERO) == 0;
   }
 }

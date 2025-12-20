@@ -1,6 +1,8 @@
-package com.example.be.payment;
+package com.example.be.payment.domain;
 
 import com.example.be.common.BaseTimeEntity;
+import com.example.be.payment.enums.EventType;
+import com.example.be.payment.enums.PaymentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
@@ -67,15 +69,5 @@ public class PaymentLog extends BaseTimeEntity {
     this.pgResponseCode = pgResponseCode;
     this.pgResponseMessage = pgResponseMessage;
     this.pgRawResponse = pgRawResponse;
-  }
-
-  public static PaymentLog of(Payment payment, EventType eventType,
-      PaymentStatus oldStatus, PaymentStatus newStatus) {
-    return PaymentLog.builder()
-        .payment(payment)
-        .eventType(eventType)
-        .oldStatus(oldStatus)
-        .newStatus(newStatus)
-        .build();
   }
 }
