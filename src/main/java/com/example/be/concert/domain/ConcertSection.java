@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -23,7 +24,6 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @Getter
-@AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
     name = "concert_sections",
@@ -49,6 +49,7 @@ public class ConcertSection extends BaseEntity {
   @JoinColumn(name = "template_id", nullable = false, foreignKey = @ForeignKey(name = "fk_concert_section_template"))
   private SectionTemplate sectionTemplate;
 
+  @Min(value = 0, message = "가격은 0 이상이어야 합니다.")
   @Column(nullable = false, precision = 10, scale = 0)
   private BigDecimal price;
 
@@ -58,16 +59,9 @@ public class ConcertSection extends BaseEntity {
   @Builder
   public ConcertSection(Concert concert, SectionTemplate sectionTemplate, BigDecimal price,
       Boolean isAvailable) {
-    validatePrice(price);
     this.concert = concert;
     this.sectionTemplate = sectionTemplate;
     this.price = price;
-    this.isAvailable = isAvailable != null ? isAvailable : false;
-  }
-
-  private void validatePrice(BigDecimal price) {
-    if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-      throw new IllegalArgumentException("가격은 0 이상이어야 합니다");
-    }
+    this.isAvailable = isAvailable != null ? isAvailable : true;
   }
 }
