@@ -1,4 +1,4 @@
-package com.example.be.auth;
+package com.example.be.auth.controller;
 
 import com.example.be.auth.dto.LoginRequest;
 import com.example.be.auth.dto.LoginResponse;
@@ -6,7 +6,7 @@ import com.example.be.auth.dto.SignupRequest;
 import com.example.be.auth.service.AuthService;
 import com.example.be.auth.util.AuthHttpHelper;
 import com.example.be.auth.validator.AuthValidator;
-import com.example.be.security.JwtUtils;
+import com.example.be.security.jwt.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -18,7 +18,6 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.micrometer.metrics.autoconfigure.export.appoptics.AppOpticsProperties;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;

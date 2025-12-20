@@ -1,6 +1,6 @@
 package com.example.be.auth.validator;
 
-import com.example.be.security.JwtProvider;
+import com.example.be.security.jwt.JwtProvider;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

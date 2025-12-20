@@ -1,6 +1,7 @@
-package com.example.be.user;
+package com.example.be.user.domain;
 
 import com.example.be.common.BaseTimeEntity;
+import com.example.be.user.enums.Provider;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;

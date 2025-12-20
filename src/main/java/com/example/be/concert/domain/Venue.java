@@ -15,14 +15,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Venue {
 
-  @Column(name = "venue_name", nullable = false)
+  @Column(name = "venue_name", nullable = false, length = 100)
   private String name;
 
-  @Column(name = "venue_address", nullable = false)
+  @Column(name = "venue_address", nullable = false, length = 300)
   private String address;
 
   @Column(name = "venue_seats")
-  private int totalSeats;
+  private Integer totalSeats;
 
   @Column(name = "venue_latitude")
   private Double latitude;

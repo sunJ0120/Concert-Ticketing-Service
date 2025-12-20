@@ -2,15 +2,13 @@ package com.example.be.config;
 
 import com.example.be.auth.service.RedisTokenService;
 import com.example.be.auth.util.OAuthLoginSuccessHandler;
-import com.example.be.security.JwtAuthenticationFilter;
-import com.example.be.security.JwtProvider;
-import com.example.be.security.JwtUtils;
-import jakarta.servlet.http.HttpServletRequest;
+import com.example.be.security.jwt.JwtAuthenticationFilter;
+import com.example.be.security.jwt.JwtProvider;
+import com.example.be.security.jwt.JwtUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;

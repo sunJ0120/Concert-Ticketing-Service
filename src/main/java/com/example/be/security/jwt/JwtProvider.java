@@ -1,6 +1,6 @@
-package com.example.be.security;
+package com.example.be.security.jwt;
 
-import com.example.be.user.Role;
+import com.example.be.user.enums.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import java.util.List;

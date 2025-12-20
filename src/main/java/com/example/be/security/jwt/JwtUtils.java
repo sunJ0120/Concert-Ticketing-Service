@@ -1,4 +1,4 @@
-package com.example.be.security;
+package com.example.be.security.jwt;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;

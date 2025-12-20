@@ -1,4 +1,4 @@
-package com.example.be.user;
+package com.example.be.user.enums;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum Role {
-    USER("USER"),
-    ADMIN("ADMIN");
+  USER("USER"),
+  ADMIN("ADMIN");
 
-    private final String role;
+  private final String role;
 }

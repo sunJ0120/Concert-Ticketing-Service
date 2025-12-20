@@ -1,4 +1,4 @@
-package com.example.be.user;
+package com.example.be.user.enums;
 
 public enum Provider {
   KAKAO, NAVER, GOOGLE
