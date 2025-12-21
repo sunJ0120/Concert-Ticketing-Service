@@ -145,7 +145,7 @@ public class AuthController {
           .build();
     }
 
-    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(refreshToken);
+    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(response.refreshToken());
     response = new LoginResponse(response.accessToken(), null);
 
     return ResponseEntity.ok()

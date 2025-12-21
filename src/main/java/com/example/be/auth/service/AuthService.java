@@ -116,6 +116,12 @@ public class AuthService {
     }
 
     String newAccessToken = jwtProvider.generateAccessToken(userId, role);
-    return new LoginResponse(newAccessToken, null);
+    String newRefreshToken = jwtProvider.generateRefreshToken(userId, role);  // 새로 생성
+
+    long newExpirationMillis =
+        jwtProvider.getExpiration(newRefreshToken) - System.currentTimeMillis();
+    redisTokenService.addToWhitelist(userId, newRefreshToken, newExpirationMillis);    // 화이트리스트 갱신
+
+    return new LoginResponse(newAccessToken, newRefreshToken);
   }
 }

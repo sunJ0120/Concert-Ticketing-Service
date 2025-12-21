@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
-public enum Status {
+public enum ConcertStatus {
   SCHEDULED("예정", "공연이 예정되어 있습니다"),
   BOOKING_OPEN("예매중", "현재 예매가 진행중입니다"),
   BOOKING_CLOSED("예매마감", "예매가 마감되었습니다"),

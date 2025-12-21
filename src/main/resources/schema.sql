@@ -1,5 +1,5 @@
 -- ================================================
--- TICKETBLITZ - Option B local sample data
+-- TICKETBLITZ - 최신 설계 반영
 -- ================================================
 
 -- ------------------------------------------------
@@ -33,99 +33,131 @@ CREATE TABLE social_accounts
 );
 
 -- ------------------------------------------------
--- 2. 공연장 템플릿 (section_templates)
+-- 2. 건물 (buildings)
 -- ------------------------------------------------
-CREATE TABLE section_templates
+CREATE TABLE buildings
 (
-    id            BIGINT PRIMARY KEY AUTO_INCREMENT,
-    venue_name    VARCHAR(100) NOT NULL,
-    section_name  VARCHAR(50)  NOT NULL,
-    row_count     INT          NOT NULL,
-    seats_per_row INT          NOT NULL,
-    color         VARCHAR(7) DEFAULT '#808080',
-    created_at    TIMESTAMP  DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP  DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT uk_venue_section UNIQUE (venue_name, section_name),
-    CONSTRAINT chk_row_count_positive CHECK (row_count > 0),
-    CONSTRAINT chk_seats_per_row_positive CHECK (seats_per_row > 0)
+    id         BIGINT PRIMARY KEY AUTO_INCREMENT,
+    name       VARCHAR(100) NOT NULL, -- "블루스퀘어"
+    address    VARCHAR(300) NOT NULL,
+    latitude   DOUBLE       NOT NULL,
+    longitude  DOUBLE       NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ------------------------------------------------
--- 3. 공연 (concerts) - Venue Embedded
+-- 3. 홀 템플릿 (hall_templates)
+-- ------------------------------------------------
+CREATE TABLE hall_templates
+(
+    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
+    building_id BIGINT       NOT NULL,
+    hall_name   VARCHAR(100) NOT NULL, -- "신한카드홀"
+    total_seats INT          NOT NULL,
+    total_rows  INT          NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_hall_template_building
+        FOREIGN KEY (building_id) REFERENCES buildings (id) ON DELETE CASCADE,
+    CONSTRAINT uk_building_hall UNIQUE (building_id, hall_name),
+    CONSTRAINT chk_total_seats_positive CHECK (total_seats > 0),
+    CONSTRAINT chk_total_rows_positive CHECK (total_rows > 0)
+);
+
+-- ------------------------------------------------
+-- 4. 홀 좌석 위치 (hall_seat_positions)
+-- ------------------------------------------------
+CREATE TABLE hall_seat_positions
+(
+    id               BIGINT PRIMARY KEY AUTO_INCREMENT,
+    hall_template_id BIGINT NOT NULL,
+    row_num          INT    NOT NULL,
+    seat_num         INT    NOT NULL,
+    x_coord          DOUBLE NOT NULL, -- 좌석 좌표 x
+    y_coord          DOUBLE NOT NULL, -- 좌석 좌표 y
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_hall_seat_position_hall
+        FOREIGN KEY (hall_template_id) REFERENCES hall_templates (id) ON DELETE CASCADE,
+    CONSTRAINT uk_hall_position UNIQUE (hall_template_id, row_num, seat_num),
+    CONSTRAINT chk_row_num_positive CHECK (row_num > 0),
+    CONSTRAINT chk_seat_num_positive CHECK (seat_num > 0)
+);
+
+-- ------------------------------------------------
+-- 5. 공연 (concerts)
 -- ------------------------------------------------
 CREATE TABLE concerts
 (
     id               BIGINT PRIMARY KEY AUTO_INCREMENT,
+    hall_template_id BIGINT       NOT NULL,
     title            VARCHAR(300) NOT NULL,
     artist           VARCHAR(200),
     description      TEXT,
     poster_url       VARCHAR(500),
 
-    -- Venue Embedded 필드들
-    venue_name       VARCHAR(100) NOT NULL, -- @Column(name = "venue_name")
-    venue_address    VARCHAR(300) NOT NULL, -- @Column(name = "venue_address")
-    venue_seats      INT,                   -- @Column(name = "venue_seats") -> totalSeats 매핑
-    venue_latitude   DOUBLE,                -- @Column(name = "venue_latitude")
-    venue_longitude  DOUBLE,                -- @Column(name = "venue_longitude")
-
     start_date       TIMESTAMP    NOT NULL,
     end_date         TIMESTAMP    NOT NULL,
     booking_start_at TIMESTAMP    NOT NULL,
     booking_end_at   TIMESTAMP    NOT NULL,
-    status           VARCHAR(20) DEFAULT 'SCHEDULED',
+    concert_status   VARCHAR(20)  NOT NULL DEFAULT 'SCHEDULED',
 
-    created_at       TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP   DEFAULT CURRENT_TIMESTAMP,
+    created_at       TIMESTAMP             DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP             DEFAULT CURRENT_TIMESTAMP,
 
+    CONSTRAINT fk_concert_hall_template
+        FOREIGN KEY (hall_template_id) REFERENCES hall_templates (id) ON DELETE RESTRICT,
     CONSTRAINT chk_concert_dates CHECK (end_date >= start_date),
     CONSTRAINT chk_booking_dates CHECK (booking_end_at >= booking_start_at)
 );
 
 -- ------------------------------------------------
--- 4. 공연별 구역 (concert_sections)
+-- 6. 공연별 구역 (concert_sections)
+-- @ElementCollection - JPA가 자동 관리
 -- ------------------------------------------------
 CREATE TABLE concert_sections
 (
-    id           BIGINT PRIMARY KEY AUTO_INCREMENT,
     concert_id   BIGINT         NOT NULL,
-    template_id  BIGINT         NOT NULL,
+    section_name VARCHAR(50)    NOT NULL,
+    row_start    INT            NOT NULL,
+    row_end      INT            NOT NULL,
     price        DECIMAL(10, 0) NOT NULL,
-    is_available BOOLEAN        NOT NULL DEFAULT TRUE,
-    created_at   TIMESTAMP               DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP               DEFAULT CURRENT_TIMESTAMP,
+    color        VARCHAR(7) DEFAULT '#808080',
 
     CONSTRAINT fk_concert_section_concert
         FOREIGN KEY (concert_id) REFERENCES concerts (id) ON DELETE CASCADE,
-    CONSTRAINT fk_concert_section_template
-        FOREIGN KEY (template_id) REFERENCES section_templates (id),
-    CONSTRAINT uk_concert_template UNIQUE (concert_id, template_id),
-    CONSTRAINT chk_price_positive CHECK (price >= 0)
+    CONSTRAINT chk_section_rows CHECK (row_end >= row_start),
+    CONSTRAINT chk_section_price_positive CHECK (price >= 0),
+
+    -- @ElementCollection은 복합키 사용
+    PRIMARY KEY (concert_id, section_name)
 );
 
 -- ------------------------------------------------
--- 5. 공연별 좌석 (concert_seats)
+-- 7. 공연별 좌석 (concert_seats)
 -- ------------------------------------------------
 CREATE TABLE concert_seats
 (
-    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-    section_id  BIGINT      NOT NULL,
-    row_num     INT         NOT NULL,
-    seat_num    INT         NOT NULL,
-    seat_label  VARCHAR(20),
-    seat_status VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
-    created_at  TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+    id                    BIGINT PRIMARY KEY AUTO_INCREMENT,
+    concert_id            BIGINT      NOT NULL,
+    hall_seat_position_id BIGINT      NOT NULL, -- 물리적 좌석 참조
+    section_name          VARCHAR(50) NOT NULL, -- 어느 섹션인지
+    seat_status           VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE',
+    created_at            TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_concert_seat_section
-        FOREIGN KEY (section_id) REFERENCES concert_sections (id) ON DELETE CASCADE,
-    CONSTRAINT uk_seat_position UNIQUE (section_id, row_num, seat_num),
-    CONSTRAINT chk_row_positive CHECK (row_num > 0),
-    CONSTRAINT chk_seat_positive CHECK (seat_num > 0)
+    CONSTRAINT fk_concert_seat_concert
+        FOREIGN KEY (concert_id) REFERENCES concerts (id) ON DELETE CASCADE,
+    CONSTRAINT fk_concert_seat_position
+        FOREIGN KEY (hall_seat_position_id) REFERENCES hall_seat_positions (id),
+    CONSTRAINT uk_concert_seat UNIQUE (concert_id, hall_seat_position_id)
 );
 
 -- ------------------------------------------------
--- 6. 예매 (reservations)
+-- 8. 예매 (reservations)
 -- ------------------------------------------------
 CREATE TABLE reservations
 (
@@ -149,7 +181,7 @@ CREATE TABLE reservations
 );
 
 -- ------------------------------------------------
--- 7. 결제 (payments)
+-- 9. 결제 (payments)
 -- ------------------------------------------------
 CREATE TABLE payments
 (
@@ -162,8 +194,8 @@ CREATE TABLE payments
     payment_status    VARCHAR(20)    NOT NULL DEFAULT 'PENDING',
 
     -- PG 응답 정보
-    pg_transaction_id VARCHAR(100), -- 다날: transactionId
-    pg_response_code  VARCHAR(20),  -- 다날: code (SUCCESS, FAIL 등)
+    pg_transaction_id VARCHAR(100),
+    pg_response_code  VARCHAR(20),
 
     -- 타임스탬프
     initiated_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -176,19 +208,20 @@ CREATE TABLE payments
     CONSTRAINT chk_payment_amount_positive CHECK (amount >= 0)
 );
 
--- payment_logs (감사 추적)
+-- ------------------------------------------------
+-- 10. 결제 로그 (payment_logs)
+-- ------------------------------------------------
 CREATE TABLE payment_logs
 (
     id                  BIGINT PRIMARY KEY AUTO_INCREMENT,
     payment_id          BIGINT      NOT NULL,
-    event_type          VARCHAR(20) NOT NULL, -- INITIATED, CONFIRMED, FAILED, REFUNDED
+    event_type          VARCHAR(20) NOT NULL,
     old_status          VARCHAR(20),
     new_status          VARCHAR(20),
 
-    -- PG 상세 응답 (로그용)
-    pg_response_code    VARCHAR(20),          -- SUCCESS, FAIL
-    pg_response_message TEXT,                 -- 상세 메시지
-    pg_raw_response     TEXT,                 -- 원본 JSON (디버깅용)
+    pg_response_code    VARCHAR(20),
+    pg_response_message TEXT,
+    pg_raw_response     TEXT,
 
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -198,122 +231,158 @@ CREATE TABLE payment_logs
 
 
 -- ================================================
--- 샘플 데이터
+-- 샘플 데이터 - 최신 설계 반영
 -- ================================================
 
 -- ------------------------------------------------
--- 1. 공연장 템플릿 (section_templates)
+-- 1. 건물 (buildings)
 -- ------------------------------------------------
-INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
-VALUES ('올림픽공원 체조경기장', 'VIP', 2, 12, '#FFD700'),
-       ('올림픽공원 체조경기장', 'R', 8, 16, '#E066FF'),
-       ('올림픽공원 체조경기장', 'S', 6, 20, '#00BFFF'),
-       ('올림픽공원 체조경기장', 'A', 4, 22, '#7CFC00');
-
-INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
-VALUES ('고척스카이돔', 'VIP', 3, 15, '#FFD700'),
-       ('고척스카이돔', 'R', 10, 20, '#E066FF'),
-       ('고척스카이돔', 'S', 8, 25, '#00BFFF'),
-       ('고척스카이돔', 'A', 6, 30, '#7CFC00');
-
-INSERT INTO section_templates (venue_name, section_name, row_count, seats_per_row, color)
-VALUES ('잠실실내체육관', 'VIP', 2, 10, '#FFD700'),
-       ('잠실실내체육관', 'R', 6, 15, '#E066FF'),
-       ('잠실실내체육관', 'S', 5, 18, '#00BFFF');
+INSERT INTO buildings (name, address, latitude, longitude)
+VALUES ('올림픽공원', '서울특별시 송파구 올림픽로 424', 37.5219, 127.1241),
+       ('고척돔', '서울특별시 구로구 경인로 430', 37.4989, 126.8672),
+       ('잠실종합운동장', '서울특별시 송파구 올림픽로 25', 37.5145, 127.0719);
 
 -- ------------------------------------------------
--- 2. 공연 (concerts) - Venue Embedded
+-- 2. 홀 템플릿 (hall_templates)
 -- ------------------------------------------------
-INSERT INTO concerts (title, artist, description, poster_url,
-                      venue_name, venue_address, venue_seats,
-                      start_date, end_date,
-                      booking_start_at, booking_end_at,
-                      status)
-VALUES ('IU Concert: The Golden Hour',
-        'IU',
-        '아이유의 감성 라이브 콘서트',
-        'https://example.com/posters/iu-golden-hour.jpg',
-        '올림픽공원 체조경기장',
-        '서울특별시 송파구 올림픽로 424',
-        15000,
-        '2025-03-15 19:00:00',
-        '2025-03-15 22:00:00',
-        '2025-01-15 20:00:00',
-        '2025-03-15 18:00:00',
-        'BOOKING_OPEN'), -- ✅ BOOKING → BOOKING_OPEN
-       ('BTS Yet To Come',
-        'BTS',
-        'BTS 컴백 콘서트',
-        'https://example.com/posters/bts-yet-to-come.jpg',
-        '올림픽공원 체조경기장',
-        '서울특별시 송파구 올림픽로 424',
-        15000,
-        '2025-04-20 18:00:00',
-        '2025-04-20 22:00:00',
-        '2025-02-20 20:00:00',
-        '2025-04-20 17:00:00',
-        'SCHEDULED');
+INSERT INTO hall_templates (building_id, hall_name, total_seats, total_rows)
+VALUES (1, '체조경기장', 15000, 20), -- 올림픽공원 체조경기장
+       (2, '스카이돔', 25000, 27),  -- 고척 스카이돔
+       (3, '실내체육관', 12000, 13);
+-- 잠실 실내체육관
 
 -- ------------------------------------------------
--- 3. 공연별 구역 (concert_sections)
+-- 3. 홀 좌석 위치 (hall_seat_positions)
 -- ------------------------------------------------
-INSERT INTO concert_sections (concert_id, template_id, price, is_available)
-VALUES (1, 1, 220000, TRUE), -- VIP
-       (1, 2, 154000, TRUE), -- R
-       (1, 3, 110000, TRUE), -- S
-       (1, 4, 77000, TRUE); -- A
-
-INSERT INTO concert_sections (concert_id, template_id, price, is_available)
-VALUES (2, 1, 300000, TRUE), -- VIP
-       (2, 2, 200000, TRUE), -- R
-       (2, 3, 150000, TRUE), -- S
-       (2, 4, 100000, TRUE);
--- A
-
--- ------------------------------------------------
--- 4. 공연별 좌석 (concert_seats) - 샘플만
--- ------------------------------------------------
--- IU 콘서트 VIP 좌석 (전체: 2줄 × 12석 = 24석)
-INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
-SELECT 1                                          as section_id,
+-- 올림픽공원 체조경기장 (hall_template_id = 1)
+-- VIP 구역 (1~2행, 각 12석) - 샘플
+INSERT INTO hall_seat_positions (hall_template_id, row_num, seat_num, x_coord, y_coord)
+SELECT 1                   as hall_template_id,
        r.row_num,
        s.seat_num,
-       CONCAT('VIP-', r.row_num, '-', s.seat_num) as seat_label,
-       'AVAILABLE'                                as seat_status
-FROM (SELECT 1 as row_num UNION SELECT 2) r,
-     (SELECT 1 as seat_num
-      UNION
-      SELECT 2
-      UNION
-      SELECT 3
-      UNION
-      SELECT 4
-      UNION
-      SELECT 5
-      UNION
-      SELECT 6
-      UNION
-      SELECT 7
-      UNION
-      SELECT 8
-      UNION
-      SELECT 9
-      UNION
-      SELECT 10
-      UNION
-      SELECT 11
-      UNION
-      SELECT 12) s;
+       (s.seat_num * 10.0) as x_coord,
+       (r.row_num * 15.0)  as y_coord
+FROM (SELECT 1 as row_num UNION SELECT 2) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION
+                     SELECT 2
+                     UNION
+                     SELECT 3
+                     UNION
+                     SELECT 4
+                     UNION
+                     SELECT 5
+                     UNION
+                     SELECT 6
+                     UNION
+                     SELECT 7
+                     UNION
+                     SELECT 8
+                     UNION
+                     SELECT 9
+                     UNION
+                     SELECT 10
+                     UNION
+                     SELECT 11
+                     UNION
+                     SELECT 12) s;
 
--- IU 콘서트 R 좌석 (샘플: 처음 2줄만)
-INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
-SELECT 2                                        as section_id,
+-- R 구역 (3~10행, 각 16석) - 샘플 (처음 2행만)
+INSERT INTO hall_seat_positions (hall_template_id, row_num, seat_num, x_coord, y_coord)
+SELECT 1                   as hall_template_id,
        r.row_num,
        s.seat_num,
-       CONCAT('R-', r.row_num, '-', s.seat_num) as seat_label,
-       'AVAILABLE'                              as seat_status
-FROM (SELECT 1 as row_num UNION SELECT 2) r,
-     (SELECT 1 as seat_num
+       (s.seat_num * 10.0) as x_coord,
+       (r.row_num * 15.0)  as y_coord
+FROM (SELECT 3 as row_num UNION SELECT 4) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION
+                     SELECT 2
+                     UNION
+                     SELECT 3
+                     UNION
+                     SELECT 4
+                     UNION
+                     SELECT 5
+                     UNION
+                     SELECT 6
+                     UNION
+                     SELECT 7
+                     UNION
+                     SELECT 8
+                     UNION
+                     SELECT 9
+                     UNION
+                     SELECT 10
+                     UNION
+                     SELECT 11
+                     UNION
+                     SELECT 12
+                     UNION
+                     SELECT 13
+                     UNION
+                     SELECT 14
+                     UNION
+                     SELECT 15
+                     UNION
+                     SELECT 16) s;
+
+-- S 구역 (11~16행, 각 20석) - 샘플 (처음 2행만)
+INSERT INTO hall_seat_positions (hall_template_id, row_num, seat_num, x_coord, y_coord)
+SELECT 1                   as hall_template_id,
+       r.row_num,
+       s.seat_num,
+       (s.seat_num * 10.0) as x_coord,
+       (r.row_num * 15.0)  as y_coord
+FROM (SELECT 11 as row_num UNION SELECT 12) r
+         CROSS JOIN (SELECT 1 as seat_num
+                     UNION
+                     SELECT 2
+                     UNION
+                     SELECT 3
+                     UNION
+                     SELECT 4
+                     UNION
+                     SELECT 5
+                     UNION
+                     SELECT 6
+                     UNION
+                     SELECT 7
+                     UNION
+                     SELECT 8
+                     UNION
+                     SELECT 9
+                     UNION
+                     SELECT 10
+                     UNION
+                     SELECT 11
+                     UNION
+                     SELECT 12
+                     UNION
+                     SELECT 13
+                     UNION
+                     SELECT 14
+                     UNION
+                     SELECT 15
+                     UNION
+                     SELECT 16
+                     UNION
+                     SELECT 17
+                     UNION
+                     SELECT 18
+                     UNION
+                     SELECT 19
+                     UNION
+                     SELECT 20) s;
+
+-- A 구역 (17~20행, 각 22석) - 샘플 (처음 1행만)
+INSERT INTO hall_seat_positions (hall_template_id, row_num, seat_num, x_coord, y_coord)
+SELECT 1                   as hall_template_id,
+       17                  as row_num,
+       s.seat_num,
+       (s.seat_num * 10.0) as x_coord,
+       (17 * 15.0)         as y_coord
+FROM (SELECT 1 as seat_num
       UNION
       SELECT 2
       UNION
@@ -343,42 +412,134 @@ FROM (SELECT 1 as row_num UNION SELECT 2) r,
       UNION
       SELECT 15
       UNION
-      SELECT 16) s;
-
--- BTS 콘서트 VIP 좌석 (전체: 2줄 × 12석 = 24석)
-INSERT INTO concert_seats (section_id, row_num, seat_num, seat_label, seat_status)
-SELECT 5                                          as section_id,
-       r.row_num,
-       s.seat_num,
-       CONCAT('VIP-', r.row_num, '-', s.seat_num) as seat_label,
-       'AVAILABLE'                                as seat_status
-FROM (SELECT 1 as row_num UNION SELECT 2) r,
-     (SELECT 1 as seat_num
+      SELECT 16
       UNION
-      SELECT 2
+      SELECT 17
       UNION
-      SELECT 3
+      SELECT 18
       UNION
-      SELECT 4
+      SELECT 19
       UNION
-      SELECT 5
+      SELECT 20
       UNION
-      SELECT 6
+      SELECT 21
       UNION
-      SELECT 7
-      UNION
-      SELECT 8
-      UNION
-      SELECT 9
-      UNION
-      SELECT 10
-      UNION
-      SELECT 11
-      UNION
-      SELECT 12) s;
+      SELECT 22) s;
 
 -- ------------------------------------------------
--- 5. 사용자 (users)
+-- 4. 공연 (concerts)
+-- ------------------------------------------------
+INSERT INTO concerts (hall_template_id, title, artist, description, poster_url,
+                      start_date, end_date, booking_start_at, booking_end_at, status)
+VALUES (1, -- 올림픽공원 체조경기장
+        'IU Concert: The Golden Hour',
+        'IU',
+        '아이유의 감성 라이브 콘서트',
+        'https://example.com/posters/iu-golden-hour.jpg',
+        '2025-03-15 19:00:00',
+        '2025-03-15 22:00:00',
+        '2025-01-15 20:00:00',
+        '2025-03-15 18:00:00',
+        'BOOKING_OPEN'),
+       (1, -- 올림픽공원 체조경기장
+        'BTS Yet To Come',
+        'BTS',
+        'BTS 컴백 콘서트',
+        'https://example.com/posters/bts-yet-to-come.jpg',
+        '2025-04-20 18:00:00',
+        '2025-04-20 22:00:00',
+        '2025-02-20 20:00:00',
+        '2025-04-20 17:00:00',
+        'SCHEDULED');
+
+-- ------------------------------------------------
+-- 5. 공연별 구역 (concert_sections)
+-- @ElementCollection - 공연마다 섹션 정의가 다름
+-- ------------------------------------------------
+-- IU 콘서트 (concert_id = 1)
+INSERT INTO concert_sections (concert_id, section_name, row_start, row_end, price)
+VALUES (1, 'VIP', 1, 2, 220000),  -- 1~2행: VIP
+       (1, 'R석', 3, 10, 154000),  -- 3~10행: R석
+       (1, 'S석', 11, 16, 110000), -- 11~16행: S석
+       (1, 'A석', 17, 20, 77000);
+-- 17~20행: A석
+
+-- BTS 콘서트 (concert_id = 2) - 다른 가격, 다른 구분!
+INSERT INTO concert_sections (concert_id, section_name, row_start, row_end, price)
+VALUES (2, 'VIP', 1, 4, 300000),  -- 1~4행: VIP (더 넓음)
+       (2, 'R석', 5, 12, 200000),  -- 5~12행: R석
+       (2, 'S석', 13, 18, 150000), -- 13~18행: S석
+       (2, 'A석', 19, 20, 100000);
+-- 19~20행: A석
+
+-- ------------------------------------------------
+-- 6. 공연별 좌석 (concert_seats)
+-- hall_seat_position_id 참조 + section_name 매핑
+-- ------------------------------------------------
+-- IU 콘서트 VIP 좌석 (1~2행, hall_seat_position_id 1~24)
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 1           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'VIP'       as section_name,
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num BETWEEN 1 AND 2;
+
+-- IU 콘서트 R석 좌석 (3~10행) - 샘플 (3~4행만)
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 1           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'R석'        as section_name,
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num BETWEEN 3 AND 4;
+
+-- IU 콘서트 S석 좌석 (11~16행) - 샘플 (11~12행만)
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 1           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'S석'        as section_name,
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num BETWEEN 11 AND 12;
+
+-- IU 콘서트 A석 좌석 (17~20행) - 샘플 (17행만)
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 1           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'A석'        as section_name,
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num = 17;
+
+-- BTS 콘서트 VIP 좌석 (1~4행) - 1~2행만 샘플
+-- 같은 hall_seat_position이지만 다른 concert_id, 다른 section_name!
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 2           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'VIP'       as section_name, -- BTS는 1~4행이 VIP
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num BETWEEN 1 AND 2;
+
+-- BTS 콘서트 R석 좌석 (5~12행) - 샘플 (3~4행 위치 재사용)
+INSERT INTO concert_seats (concert_id, hall_seat_position_id, section_name, seat_status)
+SELECT 2           as concert_id,
+       hsp.id      as hall_seat_position_id,
+       'R석'        as section_name, -- BTS는 5~12행이 R석
+       'AVAILABLE' as seat_status
+FROM hall_seat_positions hsp
+WHERE hsp.hall_template_id = 1
+  AND hsp.row_num BETWEEN 3 AND 4;
+-- 실제로는 5~12행이지만 샘플 데이터로 3~4행 재사용
+
+-- ------------------------------------------------
+-- 7. 사용자 (users)
 -- ------------------------------------------------
 INSERT INTO users (email, password, name, role)
 VALUES ('admin@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNKJsWqE.m',
@@ -388,17 +549,16 @@ VALUES ('admin@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNK
        ('user2@test.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZRGdjGj/n3.wF5gH1C5MNKJsWqE.m',
         '이영희', 'USER');
 
-
--- ================================================
--- 샘플 예매 데이터
--- ================================================
-
--- user1이 IU 콘서트 VIP-1-1 예매
-INSERT INTO reservations (user_id, seat_id, price, reservation_status, reserved_at,
+-- ------------------------------------------------
+-- 8. 예매 (reservations)
+-- ------------------------------------------------
+-- user1이 IU 콘서트 1행 1번 좌석 예매 (확정)
+INSERT INTO reservations (user_id, seat_id, price, reservation_status, reserved_at, confirmed_at,
                           expires_at)
-VALUES (2, 1, 220000, 'CONFIRMED', CURRENT_TIMESTAMP, DATEADD('MINUTE', 15, CURRENT_TIMESTAMP));
+VALUES (2, 1, 220000, 'CONFIRMED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP,
+        DATEADD('MINUTE', 15, CURRENT_TIMESTAMP));
 
--- user2가 IU 콘서트 VIP-1-2 예매 (결제 대기)
+-- user2가 IU 콘서트 1행 2번 좌석 예매 (결제 대기)
 INSERT INTO reservations (user_id, seat_id, price, reservation_status, reserved_at, expires_at)
 VALUES (3, 2, 220000, 'PENDING', CURRENT_TIMESTAMP, DATEADD('MINUTE', 15, CURRENT_TIMESTAMP));
 
@@ -409,3 +569,11 @@ WHERE id = 1;
 UPDATE concert_seats
 SET seat_status = 'RESERVED'
 WHERE id = 2;
+
+-- ------------------------------------------------
+-- 9. 결제 (payments) - 샘플
+-- ------------------------------------------------
+INSERT INTO payments (reservation_id, order_id, amount, payment_method, payment_status,
+                      pg_transaction_id, pg_response_code, initiated_at, confirmed_at)
+VALUES (1, 'ORDER-2025-001', 220000, 'CARD', 'CONFIRMED',
+        'PG-TXN-12345', 'SUCCESS', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

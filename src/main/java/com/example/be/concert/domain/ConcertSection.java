@@ -1,67 +1,60 @@
 package com.example.be.concert.domain;
 
-import com.example.be.common.BaseEntity;
+import com.example.be.concert.enums.SeatLabel;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.validation.constraints.Min;
-import java.math.BigDecimal;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-@Entity
+@Embeddable
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-    name = "concert_sections",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_concert_template",
-            columnNames = {"concert_id", "template_id"}
-        )
-    }
-)
-@EntityListeners(AuditingEntityListener.class)
-public class ConcertSection extends BaseEntity {
+public class ConcertSection {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private Long id;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "section_name", nullable = false, length = 50)
+  private SeatLabel sectionLabel;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "concert_id", nullable = false, foreignKey = @ForeignKey(name = "fk_concert_section_concert"))
-  private Concert concert;
+  @NotNull(message = "시작 행은 필수입니다.")
+  @Min(value = 1, message = "시작 행은 1 이상이어야 합니다.")
+  @Column(name = "row_start", nullable = false)
+  private Integer rowStart;
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "template_id", nullable = false, foreignKey = @ForeignKey(name = "fk_concert_section_template"))
-  private SectionTemplate sectionTemplate;
+  @NotNull(message = "종료 행은 필수입니다.")
+  @Min(value = 1, message = "종료 행은 1 이상이어야 합니다.")
+  @Column(name = "row_end", nullable = false)
+  private Integer rowEnd;
 
+  @NotNull(message = "가격은 필수입니다.")
   @Min(value = 0, message = "가격은 0 이상이어야 합니다.")
-  @Column(nullable = false, precision = 10, scale = 0)
-  private BigDecimal price;
+  @Column(name = "price", nullable = false)
+  private Integer price;
 
-  @Column(name = "is_available", nullable = false)
-  private boolean isAvailable = true;
+  @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "올바른 색상 코드 형식이 아닙니다")
+  @Column(name = "color", length = 7)
+  private String color = "#808080";    // HEX color code (#FFFFFF)
 
   @Builder
-  public ConcertSection(Concert concert, SectionTemplate sectionTemplate, BigDecimal price,
-      Boolean isAvailable) {
-    this.concert = concert;
-    this.sectionTemplate = sectionTemplate;
+  public ConcertSection(SeatLabel sectionLabel, Integer rowStart, Integer rowEnd, Integer price) {
+    validateRows(rowStart, rowEnd);
+    this.sectionLabel = sectionLabel;
+    this.rowStart = rowStart;
+    this.rowEnd = rowEnd;
     this.price = price;
-    this.isAvailable = isAvailable != null ? isAvailable : true;
+    this.color = color != null ? color : "#808080";
+  }
+
+  private void validateRows(Integer rowStart, Integer rowEnd) {
+    if (rowStart != null && rowEnd != null && rowStart > rowEnd) {
+      throw new IllegalArgumentException("시작 행은 종료 행보다 작거나 같아야 합니다.");
+    }
   }
 }

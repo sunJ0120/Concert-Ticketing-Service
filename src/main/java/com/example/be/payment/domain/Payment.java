@@ -54,7 +54,7 @@ public class Payment extends BaseTimeEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "payment_status", nullable = false, length = 20)
-  private PaymentStatus paymentStatus = PaymentStatus.PENDING;
+  private PaymentStatus paymentStatus;
 
   @Column(name = "pg_transaction_id", length = 100)
   private String pgTransactionId;
