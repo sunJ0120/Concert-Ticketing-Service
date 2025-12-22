@@ -66,6 +66,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login/social").permitAll()
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/h2-console/**").permitAll()
+                .requestMatchers("/api/v1/concerts/main").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/**").hasRole("USER").anyRequest()
                 .authenticated())
