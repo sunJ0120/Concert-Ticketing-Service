@@ -18,7 +18,7 @@ public class ConcertService {
     long count = concertRepository.countByConcertStatus(ConcertStatus.BOOKING_OPEN);
 
     List<ConcertSummaryDto> featured = concertRepository
-        .findTop10ByConcertStatusInOrderByBookingStartAtDesc(List.of(ConcertStatus.BOOKING_OPEN,
+        .findTop10ByConcertStatusInOrderByViewCountDesc(List.of(ConcertStatus.BOOKING_OPEN,
             ConcertStatus.SCHEDULED))
         .stream()
         .map(ConcertSummaryDto::from)
