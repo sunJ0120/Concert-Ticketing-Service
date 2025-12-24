@@ -31,3 +31,10 @@ VALUES
  '2024-12-01 18:00:00', '2024-12-01 22:00:00',
  '2024-11-01 20:00:00', '2024-12-01 17:00:00',
  'BOOKING_CLOSED', 'CONCERT', 2);
+
+-- 4. ConcertSections (fetch join 검증용)
+INSERT INTO concert_sections (concert_id, section_name, row_start, row_end, price, color)
+VALUES (1, 'VIP', 1, 5, 220000, '#FFD700'),
+       (1, 'R', 6, 10, 154000, '#FF69B4'),
+       (2, 'VIP', 1, 5, 200000, '#FFD700'),
+       (2, 'S', 6, 10, 100000, '#87CEEB');
