@@ -6,6 +6,7 @@ import java.time.LocalDate;
 public record ConcertSummaryDto(
     Long id,
     String title,
+    String artist,
     String genreDisplayName,
     String posterUrl,
     LocalDate startDate,
@@ -13,13 +14,15 @@ public record ConcertSummaryDto(
     String venueName,
     Integer minPrice,
     String status,
-    String statusDisplayName) {
+    String statusDisplayName,
+    Long viewCount) {
 
   public static ConcertSummaryDto from(Concert concert) {
     // @formatter:off
     return new ConcertSummaryDto(
         concert.getId(),
         concert.getTitle(),
+        concert.getArtist(),
         concert.getGenre().getDisplayName(),
         concert.getPosterUrl(),
         concert.getStartDate().toLocalDate(),
@@ -27,6 +30,7 @@ public record ConcertSummaryDto(
         concert.getHallTemplate().getFullVenueName(),
         concert.getMinPrice(),
         concert.getConcertStatus().name(),
-        concert.getConcertStatus().getDisplayName());
+        concert.getConcertStatus().getDisplayName(),
+        concert.getViewCount());
   }
 }
