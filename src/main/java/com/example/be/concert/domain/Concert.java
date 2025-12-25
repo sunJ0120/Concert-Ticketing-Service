@@ -88,6 +88,12 @@ public class Concert extends BaseEntity {
   @Column(name = "view_count")
   private long viewCount;
 
+  @Column(name = "min_price")
+  private Integer minPrice;
+
+  @Column(name = "max_price")
+  private Integer maxPrice;
+
   @ElementCollection
   @CollectionTable(
       name = "concert_sections",
@@ -112,8 +118,11 @@ public class Concert extends BaseEntity {
       LocalDateTime bookingEndAt,
       ConcertStatus concertStatus,
       Genre genre,
+      Integer minPrice,
+      Integer maxPrice,
       long viewCount,
       List<ConcertSection> concertSections) {
+    validateConcertPrice(minPrice, maxPrice);
     validateConcertDate(startDate, endDate);
     validateBookingDate(bookingStartAt, bookingEndAt);
 
@@ -129,6 +138,8 @@ public class Concert extends BaseEntity {
     this.concertStatus = concertStatus != null ? concertStatus : ConcertStatus.SCHEDULED;
     this.genre = genre;
     this.viewCount = concertStatus != null ? viewCount : 0;
+    this.minPrice = minPrice;
+    this.maxPrice = maxPrice;
 
     if (concertSections != null) {
       this.concertSections = concertSections;
@@ -139,8 +150,23 @@ public class Concert extends BaseEntity {
     return concertSections.stream().mapToInt(ConcertSection::getPrice).min().orElse(0);
   }
 
+  // 섹션 변경 시 갱신
+  public void updatePriceRange() {
+    this.minPrice = concertSections.stream().mapToInt(ConcertSection::getPrice).min().orElse(0);
+    this.maxPrice = concertSections.stream().mapToInt(ConcertSection::getPrice).max().orElse(0);
+  }
+
   public void incrementViewCount() {
     this.viewCount += 1;
+  }
+
+  private void validateConcertPrice(Integer minPrice, Integer maxPrice) {
+    if (minPrice == null || maxPrice == null) {
+      return;
+    }
+    if (minPrice > maxPrice) {
+      throw new IllegalArgumentException("최소 금액은 최대 금액보다 작아야 합니다.");
+    }
   }
 
   private void validateConcertDate(LocalDateTime startDate, LocalDateTime endDate) {
