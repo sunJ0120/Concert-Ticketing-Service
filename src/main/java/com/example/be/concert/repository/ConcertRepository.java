@@ -9,7 +9,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-public interface ConcertRepository extends JpaRepository<Concert, Long> {
+public interface ConcertRepository extends JpaRepository<Concert, Long>, ConcertRepositoryCustom {
 
   long countByConcertStatus(ConcertStatus status); // 상태별 카운트
 
