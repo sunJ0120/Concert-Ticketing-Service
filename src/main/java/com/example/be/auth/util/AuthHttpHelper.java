@@ -9,15 +9,16 @@ import org.springframework.stereotype.Component;
 public class AuthHttpHelper {
 
   private static final String REFRESH_TOKEN_NAME = "refresh_token";
+  private static final String REFRESH_REQUEST_URL = "/api/auth/refresh";
+  private static final int REFRESH_TOKEN_MAX_AGE_SECONDS = 60 * 60;
 
   public String extractRefreshToken(HttpServletRequest request) {
-    // 1. request에서 header 분리
     Cookie[] cookies = request.getCookies();
     if (cookies == null) {
       return null;
     }
 
-    for (Cookie cookie : request.getCookies()) {
+    for (Cookie cookie : cookies) {
       if (REFRESH_TOKEN_NAME.equals(cookie.getName())) {
         return cookie.getValue();
       }
@@ -25,25 +26,20 @@ public class AuthHttpHelper {
     return null;
   }
 
-  public static ResponseCookie createLogoutCookie() {
-    ResponseCookie cookie =
-        ResponseCookie.from(REFRESH_TOKEN_NAME, "")
-            .maxAge(0)
-            .path("/api/auth/refresh")
-            .httpOnly(true)
-            .build();
-    return cookie;
+  public ResponseCookie createRefreshTokenCookie(String refreshToken) {
+    return buildCookieBase(refreshToken, REFRESH_TOKEN_MAX_AGE_SECONDS).build();
   }
 
-  public ResponseCookie getResponseCookie(String refreshToken) {
-    ResponseCookie responseCookie =
-        ResponseCookie.from(REFRESH_TOKEN_NAME, refreshToken)
-            .maxAge(3600)
-            .path("/api/auth/refresh") // 해당 url이 요청할때만 전송
-            .secure(true)
-            .httpOnly(true)
-            .sameSite("Lax")
-            .build();
-    return responseCookie;
+  public ResponseCookie createLogoutCookie() {
+    return buildCookieBase("", 0).build();
+  }
+
+  private ResponseCookie.ResponseCookieBuilder buildCookieBase(String value, int maxAge) {
+    return ResponseCookie.from(REFRESH_TOKEN_NAME, value)
+        .maxAge(maxAge)
+        .path(REFRESH_REQUEST_URL)
+        .secure(true)
+        .httpOnly(true)
+        .sameSite("Lax");
   }
 }

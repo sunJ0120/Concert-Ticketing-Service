@@ -65,7 +65,7 @@ public class AuthController {
 
     // refreshToken 분리해서 따로 HttpOnly에 저장
     String refreshToken = response.refreshToken();
-    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(refreshToken);
+    ResponseCookie responseCookie = authHttpHelper.createRefreshTokenCookie(refreshToken);
 
     response = new LoginResponse(response.accessToken(), null);
 
@@ -100,7 +100,7 @@ public class AuthController {
 
     // refreshToken 분리해서 따로 HttpOnly에 저장
     String refreshToken = loginResponse.refreshToken();
-    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(refreshToken);
+    ResponseCookie responseCookie = authHttpHelper.createRefreshTokenCookie(refreshToken);
     response.addHeader(HttpHeaders.SET_COOKIE, responseCookie.toString());
 
     // accesss token만 전달
@@ -149,7 +149,8 @@ public class AuthController {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
-    ResponseCookie responseCookie = authHttpHelper.getResponseCookie(response.refreshToken());
+    ResponseCookie responseCookie =
+        authHttpHelper.createRefreshTokenCookie(response.refreshToken());
     response = new LoginResponse(response.accessToken(), null);
 
     return ResponseEntity.ok()
